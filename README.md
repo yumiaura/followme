@@ -1,6 +1,6 @@
 # followme
 
-`followme` is a small CLI that scans Python repositories on GitHub, uses `codecat` with a local **Ollama** model to grade authors, and helps identify experienced Python developers.
+`followme` is a small CLI that scans repositories on GitHub and uses a local **Ollama** model to grade authors.
 
 This repository exists to help you discover experienced Python developers, learn from how they write code, and grow your own skills by following their work.
 
@@ -9,15 +9,14 @@ This repository exists to help you discover experienced Python developers, learn
 - Scans recent Python repositories from GitHub Search API.
 - Supports single-repository mode via `username__reponame`.
 - Clones repositories with `--depth 1`.
-- Collects Python-file digest and requests:
+- Collects a compact repository digest and requests:
   - numeric grade (`1.0 .. 10.0`)
   - short comment
   - detailed style profile
 - Appends style profiles to `data/code_style/{username}__{reponame}.md`.
 - Writes every result to CSV (`data/results.csv` by default).
-- If `grade > FOLLOW_Y`, performs:
-  - `star` repository
-  - `follow` repository owner
+- If `grade > FOLLOW_STAR_GRADE`, stars the repository.
+- If `grade > FOLLOW_GRADE`, follows the repository owner.
 
 ## Requirements
 
@@ -25,16 +24,17 @@ This repository exists to help you discover experienced Python developers, learn
 - Git CLI installed
 - Network access to GitHub
 - Ollama running with an installed model (for example `qwen2.5-coder:7b`)
+- Python package dependencies from `requirements.txt` (`Jinja2` for `templates/PROMT_*.j2`)
 
-## Quick Install (with install.py, for beginners)
+## Quick Install (with scripts/install.py, for beginners)
 
 Run from project root:
 
 ```bash
-python3 install.py
+python3 scripts/install.py
 ```
 
-What `install.py` does:
+What `scripts/install.py` does:
 
 - creates `.venv` automatically if missing
 - installs dependencies from `requirements.txt`
@@ -48,7 +48,7 @@ After install, run:
 python3 followme.py -l 20
 ```
 
-## Detailed setup (without install.py)
+## Detailed setup (without scripts/install.py)
 
 ### 1) Create and activate virtual environment
 
@@ -63,11 +63,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`requirements.txt` installs `codecat` directly from GitHub:
-
-```text
-git+https://github.com/yumiaura/codecat.git
-```
+`requirements.txt` installs `Jinja2`, which renders `templates/PROMT_MD.j2` and `templates/PROMT_CSV.j2`.
 
 ### 3) Create `.env` manually
 
@@ -84,15 +80,16 @@ Set in `.env` at least:
 
 Then verify or adjust:
 
-- `FOLLOW_Y` (default `7.5`)
+- `FOLLOW_GRADE` (default `7.5`, threshold for following repository owner)
+- `FOLLOW_STAR_GRADE` (default `7.5`, threshold for starring repository)
 - `FOLLOW_SCAN_LIMIT` (default `100`)
 - `FOLLOW_LANGUAGE` (default `Python`)
 - `FOLLOW_OUTPUT_LANGUAGE` (default `English`)
 - `MAX_STARS` (default `100`)
 - `FOLLOW_RESULTS_CSV` (default `data/results.csv`)
+- `FOLLOW_ANALYSIS_DIR` (default `data/analysis`, used for optional digest files)
 - `FOLLOW_DRY_RUN` (`true`/`false`)
 - `FOLLOW_INFINITE_SLEEP_SECONDS` (default `600`, used by `-i/--infinite` when `-s/--sleep` is omitted)
-- `CODECAT_DIR` (optional fallback for local source import)
 
 ### 4) Run scanner
 
@@ -113,6 +110,8 @@ python3 followme.py -l 20
 Optional flags:
 
 - `-t` / `--threshold 8.0`
+- `--follow-grade 8.0`
+- `--star-grade 8.5`
 - `--dry-run`
 - `-r` / `--repo username__reponame` (single repository mode)
 - `-i` / `--infinite` + optional `-s` / `--sleep <seconds>` (repeat forever: fetch up to `-l/--limit` repos each cycle, sleep, repeat)
@@ -121,8 +120,10 @@ Optional flags:
 Example:
 
 ```bash
-python3 followme.py -l 10 -t 8.2 --dry-run
+python3 followme.py -l 10 --follow-grade 8.2 --star-grade 8.5 --dry-run
 ```
+
+Compatibility example: `-t/--threshold` still sets both follow and star thresholds when the newer flags are omitted.
 
 Infinite mode example (100 repos per cycle from `.env` / defaults, sleep 300s):
 
@@ -144,6 +145,20 @@ Dry run example:
 python3 followme.py -r yumiaura__followme --dry-run
 ```
 
+### 3) Helper scripts
+
+Preview GitHub users who would be unfollowed because they do not follow you back:
+
+```bash
+python3 scripts/unfollow.py --dry-run
+```
+
+Run the unfollow action:
+
+```bash
+python3 scripts/unfollow.py
+```
+
 ## Output
 
 - CSV report: `data/results.csv`
@@ -152,7 +167,7 @@ python3 followme.py -r yumiaura__followme --dry-run
 
 ## Grade scale
 
-`followme` requests strict grading anchors from `codecat`:
+`followme` requests strict grading anchors from Ollama:
 
 - `1.0` = junior
 - `5.0` = middle
@@ -165,7 +180,5 @@ Returned grade is clamped to `1.0 .. 10.0`.
 - `Bad credentials (401)`:
   - verify `GITHUB_TOKEN`
   - ensure token has permissions for follow and starring.
-- `codecat runtime is not importable`:
+- `ModuleNotFoundError: No module named 'jinja2'`:
   - run `pip install -r requirements.txt`
-  - or set `CODECAT_DIR` to local codecat source.
-

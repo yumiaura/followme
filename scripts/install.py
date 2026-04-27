@@ -159,7 +159,7 @@ def render_env_text(project_root: Path, overrides: dict[str, str]) -> str:
     if missing_keys:
         if rendered_lines and rendered_lines[-1].strip():
             rendered_lines.append("")
-        rendered_lines.append("# Added by install.py")
+        rendered_lines.append("# Added by scripts/install.py")
         for key in missing_keys:
             rendered_lines.append(f"{key}={overrides[key]}")
     rendered_lines.append("")
@@ -180,7 +180,7 @@ def write_env_file(project_root: Path, env_text: str) -> None:
 
 def main() -> None:
     """Program entrypoint."""
-    project_root = Path(__file__).resolve().parent
+    project_root = Path(__file__).resolve().parent.parent
     env_path = project_root / ".env"
     env_example_path = project_root / "env.example"
     existing_env_values = parse_env_file(env_path)
