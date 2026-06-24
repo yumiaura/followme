@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: smoke (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Compile
+        run: python -m compileall -q libs scripts main.py
+
+      - name: CLI help smoke tests
+        run: |
+          python main.py --help
+          python scripts/fetch.py --help
+          python scripts/evaluate.py --help
+          python scripts/subscribe.py --help
+          python scripts/star.py --help
